@@ -1,0 +1,44 @@
+name: Website change monitor
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # примерно каждые 10 минут
+  workflow_dispatch:          # кнопка ручного запуска
+
+permissions:
+  contents: write             # чтобы сохранять снимок обратно в репозиторий
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run check
+        env:
+          TARGET_URL: ${{ vars.TARGET_URL }}
+          MODE: ${{ vars.MODE }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python check.py
+
+      - name: Save snapshot
+        run: |
+          if [[ -n "$(git status --porcelain snapshot.txt)" ]]; then
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add snapshot.txt
+            git commit -m "Update snapshot"
+            git push
+          else
+            echo "Снимок не изменился, коммитить нечего."
+          fi
